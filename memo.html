@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>My Pop Memo</title>
+    <link rel="icon" href="icon.png">
+    
+    <style>
+        :root {
+            --bg-color: #fff9c4; /* パステルイエロー */
+            --accent-color: #ff4081; /* 鮮やかなピンク */
+            --tab-inactive: #fce4ec;
+            --border-width: 3px;
+        }
+
+        body {
+            font-family: "Meiryo", "Hiragino Kaku Gothic ProN", sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .app-window {
+            width: 90%;
+            max-width: 850px;
+            height: 85vh;
+            background: white;
+            border-radius: 30px;
+            border: var(--border-width) solid #333;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.1);
+        }
+
+        /* タブエリア */
+        .tabs-header {
+            background: #ffe0b2;
+            display: flex;
+            padding: 15px 15px 0;
+            gap: 10px;
+            border-bottom: var(--border-width) solid #333;
+            overflow-x: auto;
+            align-items: flex-end;
+            scrollbar-width: thin;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: var(--tab-inactive);
+            border: var(--border-width) solid #333;
+            border-bottom: none;
+            border-radius: 15px 15px 0 0;
+            cursor: grab;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+            transition: background 0.2s, transform 0.1s;
+            user-select: none;
+        }
+
+        .tab.active {
+            background: white;
+            color: var(--accent-color);
+            padding-bottom: 12px;
+            margin-bottom: -3px;
+        }
+
+        .tab:active { cursor: grabbing; }
+
+        .tab.drag-over {
+            border-left: 6px solid var(--accent-color);
+        }
+
+        .add-btn {
+            background: var(--accent-color);
+            color: white;
+            border: var(--border-width) solid #333;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 24px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 編集エリア */
+        .editor-container {
+            flex: 1;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+        }
+
+        .title-field {
+            border: none;
+            border-bottom: var(--border-width) dashed #333;
+            font-size: 28px;
+            font-weight: bold;
+            padding: 10px 0;
+            margin-bottom: 20px;
+            color: var(--accent-color);
+            outline: none;
+            background: transparent;
+        }
+
+        .memo-field {
+            flex: 1;
+            border: none;
+            font-size: 20px;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            color: #333;
+            background: transparent;
+        }
+
+        .delete-icon {
+            color: #999;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .delete-icon:hover { color: #ff0000; }
+
+        /* スクロールバーのデザイン */
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-thumb { background: var(--accent-color); border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="app-window">
+    <div class="tabs-header" id="tabsHeader">
+        <button class="add-btn" onclick="addTab()" title="新しいメモを追加">＋</button>
+    </div>
+    
+    <div class="editor-container">
+        <input type="text" id="currentTitle" class="title-field" placeholder="タイトルを入力...">
+        <textarea id="currentContent" class="memo-field" placeholder="ここにメモを書いてね！自動で保存されます。"></textarea>
+    </div>
+</div>
+
+<script>
+    // --- データの読み込みと引き継ぎ ---
+    const storageKeys = ['popMemo_Final_Storage', 'popMemoStorageV3', 'popMemoStorage', 'popTabsMemo'];
+    let savedData = null;
+
+    for (let key of storageKeys) {
+        const data = localStorage.getItem(key);
+        if (data) {
+            savedData = JSON.parse(data);
+            break; 
+        }
+    }
+
+    let memoData = savedData || [{ id: Date.now(), title: "メモ 1", content: "" }];
+    let activeTabId = memoData[0].id;
+    let draggedId = null;
+
+    const tabsHeader = document.getElementById('tabsHeader');
+    const titleInput = document.getElementById('currentTitle');
+    const contentInput = document.getElementById('currentContent');
+
+    function save() {
+        localStorage.setItem('popMemo_Final_Storage', JSON.stringify(memoData));
+    }
+
+    function render() {
+        const addBtn = document.querySelector('.add-btn');
+        document.querySelectorAll('.tab').forEach(el => el.remove());
+
+        memoData.forEach((memo) => {
+            const tabEl = document.createElement('div');
+            tabEl.className = `tab ${memo.id === activeTabId ? 'active' : ''}`;
+            tabEl.setAttribute('draggable', 'true');
+            tabEl.dataset.id = memo.id;
+
+            tabEl.innerHTML = `
+                <span class="tab-txt">${memo.title || '無題'}</span>
+                <span class="delete-icon" title="削除">✕</span>
+            `;
+
+            // クリックで切り替え
+            tabEl.onclick = () => switchTab(memo.id);
+            
+            // 削除ボタン
+            tabEl.querySelector('.delete-icon').onclick = (e) => {
+                e.stopPropagation();
+                deleteTab(memo.id);
+            };
+
+            // ドラッグ＆ドロップイベント
+            tabEl.addEventListener('dragstart', (e) => {
+                draggedId = memo.id;
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            tabEl.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                tabEl.classList.add('drag-over');
+            });
+            tabEl.addEventListener('dragleave', () => tabEl.classList.remove('drag-over'));
+            tabEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                tabEl.classList.remove('drag-over');
+                handleSort(memo.id);
+            });
+
+            tabsHeader.insertBefore(tabEl, addBtn);
+        });
+
+        // 現在のメモ内容を表示
+        const activeMemo = memoData.find(m => m.id === activeTabId);
+        if (activeMemo) {
+            titleInput.value = activeMemo.title;
+            contentInput.value = activeMemo.content;
+        }
+    }
+
+    function handleSort(targetId) {
+        if (draggedId === targetId) return;
+        const fromIdx = memoData.findIndex(m => m.id === draggedId);
+        const toIdx = memoData.findIndex(m => m.id === targetId);
+        const [movedItem] = memoData.splice(fromIdx, 1);
+        memoData.splice(toIdx, 0, movedItem);
+        render();
+        save();
+    }
+
+    function addTab() {
+        const newId = Date.now();
+        memoData.push({ id: newId, title: "新しいメモ", content: "" });
+        activeTabId = newId;
+        render();
+        save();
+    }
+
+    function switchTab(id) {
+        activeTabId = id;
+        render();
+    }
+
+    function deleteTab(id) {
+        if (memoData.length === 1) {
+            alert("最後のメモは削除できません。");
+            return;
+        }
+        if (confirm("このメモを削除してもよろしいですか？")) {
+            memoData = memoData.filter(m => m.id !== id);
+            if (activeTabId === id) activeTabId = memoData[0].id;
+            render();
+            save();
+        }
+    }
+
+    // タイトル入力時にタブ名をリアルタイム更新
+    titleInput.addEventListener('input', () => {
+        const memo = memoData.find(m => m.id === activeTabId);
+        if (memo) {
+            memo.title = titleInput.value;
+            // 画面全体の再描画を避け、該当するタブのテキストだけ書き換える
+            const activeTabTxt = document.querySelector('.tab.active .tab-txt');
+            if (activeTabTxt) activeTabTxt.innerText = titleInput.value || '無題';
+            save();
+        }
+    });
+
+    // 本文入力時の自動保存
+    contentInput.addEventListener('input', () => {
+        const memo = memoData.find(m => m.id === activeTabId);
+        if (memo) {
+            memo.content = contentInput.value;
+            save();
+        }
+    });
+
+    // 初期化
+    render();
+</script>
+
+</body>
+</html>
