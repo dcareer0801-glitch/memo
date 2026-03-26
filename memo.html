@@ -2,8 +2,13 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Pop Memo</title>
-    <link rel="icon" href="icon.png">
+
+    <link rel="icon" href="icon.png" type="image/png">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     
     <style>
         :root {
@@ -191,16 +196,13 @@
                 <span class="delete-icon" title="削除">✕</span>
             `;
 
-            // クリックで切り替え
             tabEl.onclick = () => switchTab(memo.id);
             
-            // 削除ボタン
             tabEl.querySelector('.delete-icon').onclick = (e) => {
                 e.stopPropagation();
                 deleteTab(memo.id);
             };
 
-            // ドラッグ＆ドロップイベント
             tabEl.addEventListener('dragstart', (e) => {
                 draggedId = memo.id;
                 e.dataTransfer.effectAllowed = 'move';
@@ -219,7 +221,6 @@
             tabsHeader.insertBefore(tabEl, addBtn);
         });
 
-        // 現在のメモ内容を表示
         const activeMemo = memoData.find(m => m.id === activeTabId);
         if (activeMemo) {
             titleInput.value = activeMemo.title;
@@ -263,19 +264,16 @@
         }
     }
 
-    // タイトル入力時にタブ名をリアルタイム更新
     titleInput.addEventListener('input', () => {
         const memo = memoData.find(m => m.id === activeTabId);
         if (memo) {
             memo.title = titleInput.value;
-            // 画面全体の再描画を避け、該当するタブのテキストだけ書き換える
             const activeTabTxt = document.querySelector('.tab.active .tab-txt');
             if (activeTabTxt) activeTabTxt.innerText = titleInput.value || '無題';
             save();
         }
     });
 
-    // 本文入力時の自動保存
     contentInput.addEventListener('input', () => {
         const memo = memoData.find(m => m.id === activeTabId);
         if (memo) {
@@ -284,7 +282,6 @@
         }
     });
 
-    // 初期化
     render();
 </script>
 
